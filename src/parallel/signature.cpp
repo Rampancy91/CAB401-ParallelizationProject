@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
     // ========== PARALLEL PROCESSING ==========
     std::vector<std::vector<PartitionSignature>> all_signatures(sequences.size());
 
-#pragma omp parallel for schedule(dynamic, 10)  // Added chunk size!
+    #pragma omp parallel for schedule(guided, 64)  
     for (int seq_idx = 0; seq_idx < (int)sequences.size(); seq_idx++)
     {
         int starting_doc = doc_id_starts[seq_idx];
