@@ -5,6 +5,9 @@
 #include "uthash.h"
 #include <chrono>
 
+#include <omp.h>
+#include <vector>
+
 
 typedef unsigned char byte;
 
@@ -41,6 +44,14 @@ hash_term *vocab = NULL;
 #define MAX_KMERS 8000
 short precomputed_sigs[MAX_KMERS][SIGNATURE_LEN];
 bool use_precomputed = true; //To toggle between methods
+
+//Structure to hold partitions signature data
+
+struct PartitionSignature {
+    int doc_id;
+    byte signature[SIGNATURE_LEN / 8];
+};
+
 
 //K-mer index functions
 //Convert kmer to unique index
