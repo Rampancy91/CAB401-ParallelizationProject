@@ -5,6 +5,7 @@
 #include "uthash.h"
 #include <chrono>
 
+
 typedef unsigned char byte;
 
 #define SIGNATURE_LEN 64
@@ -136,7 +137,18 @@ int power(int n, int e)
 int main(int argc, char* argv[])
 {
     //const char* filename = "qut2.fasta";
-    const char* filename = "qut3.fasta";
+    //const char* filename = "qut3.fasta";
+
+    const char* filename; 
+
+    // Allowing command line input or default to small test file
+
+    if (argc > 1) {
+        filename = argv[1];
+    }
+    else {
+        filename = "test.fasta";  // Default
+    }
     
     WORDLEN = 3;
     PARTITION_SIZE = 16;

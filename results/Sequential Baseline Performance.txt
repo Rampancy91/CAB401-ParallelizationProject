@@ -1,0 +1,20 @@
+Sequential Baseline Performance
+================================
+Date: 25/10/2025
+Target hardware: AMD Ryzen 9 3900XT 12-core processor
+Cores: 12 cores/ 24 logical processors
+RAM: 32GB
+Compiler: Visual Studio 2022, x64 Release /O2
+
+Configuration:
+- WORDLEN: 3
+- PARTITION_SIZE: 16  
+- SIGNATURE_LEN: 64
+
+Results (Release Build):
+------------------------
+File          | Size    | Time (s) 
+-------------------------------------------------------
+test.fasta    | 0.3KB   | 0.000870         
+qut2.fasta    |  433MB  | 42.849150         
+qut3.fasta    |   43MB  | 4.303480         

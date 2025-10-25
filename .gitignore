@@ -416,3 +416,25 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# ==================================================
+# CreateSigs Project Specific
+# ==================================================
+
+# Output signature files
+*.part*_sigs*_*
+*.sig
+
+# FASTA files
+*.fasta
+
+# Profiling results
+*.vsp
+*.psess
+*.vspx
+*.diagsession
+
+# Temporary/test output
+output/
+temp/
+
