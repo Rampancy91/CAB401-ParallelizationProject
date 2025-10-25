@@ -1,0 +1,26 @@
+Pre-Computation Optimization Performance
+===================================================
+Date: 25/10/2025
+Target hardware: AMD Ryzen 9 3900XT 12-core processor
+Cores: 12 cores/ 24 logical processors
+RAM: 32GB
+Compiler: Visual Studio 2022, x64 Release /O2
+
+Sequential Baseline (Hash Table):
+----------------------------------
+qut2.fasta (433MB): 45.474 seconds
+qut3.fasta (43MB):  4.207 seconds
+
+Optimized (Pre-computed Array):
+--------------------------------
+Pre-computation time: 0.007 seconds (one-time startup cost)
+qut2.fasta (433MB): 23.701 seconds (1.92x speedup)
+qut3.fasta (43MB):  2.278 seconds (1.84x speedup)
+
+Optimization Details:
+---------------------
+- Eliminated hash table lookups (80% of original runtime)
+- Pre-computed all 8,000 possible 3-mer signatures at startup
+- Direct array indexing: O(1) with no collision handling
+- Memory usage: +1 MB (8,000 signatures × 64 shorts)
+

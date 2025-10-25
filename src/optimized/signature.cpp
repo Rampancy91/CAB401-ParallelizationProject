@@ -1,4 +1,4 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -35,6 +35,35 @@ typedef struct
 
 hash_term *vocab = NULL;
 
+//pre-compute signatures array
+// Only 20^3 = 8000 possible combinations
+
+#define MAX_KMERS 8000
+short precomputed_sigs[MAX_KMERS][SIGNATURE_LEN];
+bool use_precomputed = true; //To toggle between methods
+
+//K-mer index functions
+//Convert kmer to unique index
+int kmer_to_index(char* term)
+{
+    int index = 0;
+    for (int i = 0; i < WORDLEN; i++)
+    {
+        index = index * 20 + inverse[(unsigned char)term[i]];
+    }
+    return index;
+}
+
+//Convert index back to k-mer
+void index_to_kmer(int index, char* term)
+{
+    for (int i = WORDLEN - 1; i >= 0; i--)
+    {
+        term[i] = alphabet[index % 20];
+        index /= 20;
+    }
+    term[WORDLEN] = '\0';
+}
 
 short* compute_new_term_sig(char* term, short *term_sig)
 {
@@ -66,7 +95,39 @@ short* compute_new_term_sig(char* term, short *term_sig)
     return term_sig;
 }
 
-short *find_sig(char* term)
+//Pre compute all 8000 possible signatures
+void precompute_all_signatures()
+{
+    printf("Pre-computing all %d possible %d-mer signatures...\n", MAX_KMERS, WORDLEN);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    char term[10];
+    for (int i = 0; i < MAX_KMERS; i++)
+    {
+        // Convert index to k-mer
+        index_to_kmer(i, term);
+
+        // Generate signature
+        memset(precomputed_sigs[i], 0, sizeof(precomputed_sigs[i]));
+        compute_new_term_sig(term, precomputed_sigs[i]);
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+
+    printf("Pre-computation complete in %f seconds\n", duration.count());
+}
+
+// New version -  signature lookup using pre-computed array
+short* find_sig_fast(char* term)
+{
+    int index = kmer_to_index(term);
+    return precomputed_sigs[index];
+}
+
+// Old version - hash table look up
+short *find_sig_hash(char* term)
 {
     hash_term *entry;
     HASH_FIND(hh, vocab, term, WORDLEN, entry);
@@ -80,6 +141,15 @@ short *find_sig(char* term)
     }
 
     return entry->sig;
+}
+
+//Use selected method
+short* find_sig(char* term)
+{
+    if (use_precomputed)
+        return find_sig_fast(term);
+    else
+        return find_sig_hash(term);
 }
 
 
@@ -157,6 +227,12 @@ int main(int argc, char* argv[])
     for (int i=0; i<strlen(alphabet); i++)
         inverse[alphabet[i]] = i;
 
+    //Pre-compute signatures
+    if (use_precomputed) 
+    {
+        precompute_all_signatures();
+    }
+
     auto start = std::chrono::high_resolution_clock::now();
 
     FILE* file;
@@ -189,6 +265,16 @@ int main(int argc, char* argv[])
     std::chrono::duration<double> duration = end - start;
 
     printf("%s %f seconds\n", filename, duration.count());
+
+    // Show which method was used
+    if (use_precomputed)
+    {
+        printf("Method: Pre-computed array lookup\n");
+    }
+    else
+    {
+        printf("Method: Hash table lookup\n");
+    }
 
     return 0;
 }

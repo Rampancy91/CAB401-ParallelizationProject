@@ -1,4 +1,4 @@
-﻿/*
+/*
  * ------------------------------------------------------------------------------
  *  rand.c: By Bob Jenkins.  My random number generator, ISAAC.  Public Domain.
  *  MODIFIED:
