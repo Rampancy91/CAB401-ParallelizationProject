@@ -1,0 +1,36 @@
+Performance Analysis
+===================================================
+Date: 25/10/2025 - 26/10/2025
+Target hardware: AMD Ryzen 9 3900XT 12-core processor
+Cores: 12 cores/ 24 logical processors
+RAM: 32GB
+Compiler: Visual Studio 2022, x64 Release /O2
+
+Sequential Baseline (Hash Table):
+----------------------------------
+qut2.fasta (433MB): 45.47 seconds
+qut3.fasta (43MB):  4.44 seconds
+
+Optimized (Pre-computed Array replacing hashtable):
+--------------------------------
+qut2.fasta (433MB): 23.701 seconds (1.92x speedup)
+qut3.fasta (43MB):  2.278 seconds (1.84x speedup)
+
+Sequence Parallelized OpenMP 24 Cores
+--------------------------------
+qut2.fasta (433MB): 8.094685 seconds (2.92x speedup from optimized, 5.61x from baseline sequential)   
+qut3.fasta (43MB): 0.883144 seconds (2.58x speedup from optimized, 4.76x from baseline sequential)
+
+Parallelized OpenMP 24 Cores - Inline function adjustments
+--------------------------------
+qut2.fasta (433MB) 7.15313 seconds (6.3x speedup from baseline)
+qut3.fasta (43MB) 0.88 seconds
+
+Final Partition Parallelisation and Input/Output Parallelization
+--------------------------------
+qut2.fasta (433MB) 1.79 seconds (25.4x speedup from baseline)
+qut3.fasta (43MB) 0.18 seconds (24.6x speedup from baseline)
+
+
+
+

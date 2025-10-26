@@ -15,10 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\final_ISAAC-rand.cpp">
+    <ClCompile Include="..\..\ISAAC-rand.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\final_signature.cpp">
+    <ClCompile Include="..\..\signature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -9,17 +9,10 @@
 #include <vector>
 #include <string>
 
-// Platform-specific includes for memory mapping
-#ifdef _WIN32
+// Windows includes for memory mapping
 #define NOMINMAX
 #include <windows.h>
 #include <io.h>
-#else
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#endif
 
 typedef unsigned char byte;
 
@@ -122,7 +115,6 @@ short* compute_new_term_sig(char* term, short* term_sig)
 
 void precompute_all_signatures()
 {
-    printf("Pre-computing all %d possible %d-mer signatures...\n", MAX_KMERS, WORDLEN);
     auto start = std::chrono::high_resolution_clock::now();
 
     char term[10];
@@ -135,7 +127,6 @@ void precompute_all_signatures()
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
-    printf("Pre-computation complete in %f seconds\n", duration.count());
 }
 
 short* find_sig_fast(char* term)
@@ -167,8 +158,6 @@ short* find_sig(char* term)
         return find_sig_hash(term);
 }
 
-//#define min(a,b) ((a) < (b) ? (a) : (b))
-
 inline int count_partitions(int seq_len)
 {
     int count = 0;
@@ -188,13 +177,11 @@ int power(int n, int e)
     return p;
 }
 
-// Robust parallel FASTA parser with CRLF handling and safe chunk boundaries
 std::vector<SequenceInfo> parse_fasta_parallel(const char* filename, size_t& file_size)
 {
     std::vector<SequenceInfo> sequences;
 
-    // --- Memory map the file (platform-specific as before) ---
-#ifdef _WIN32
+    // --- Memory map the file ---
     HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) return sequences;
@@ -208,43 +195,8 @@ std::vector<SequenceInfo> parse_fasta_parallel(const char* filename, size_t& fil
 
     const char* mapped = (const char*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
     if (!mapped) { CloseHandle(hMapping); CloseHandle(hFile); return sequences; }
-#else
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1) return sequences;
 
-    struct stat sb;
-    if (fstat(fd, &sb) == -1) { close(fd); return sequences; }
-    file_size = sb.st_size;
-
-    const char* mapped = (const char*)mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped == MAP_FAILED) { close(fd); return sequences; }
-#endif
-
-    // --- Fallback for very small files ---
     int num_threads = omp_get_max_threads();
-    if (file_size < 1024 || num_threads == 1) {
-        size_t line_start = 0;
-        bool expect_sequence = false;
-        for (size_t i = 0; i < file_size; i++) {
-            if (mapped[i] == '\n' || mapped[i] == '\r') {
-                size_t line_len = i - line_start;
-                if (line_len > 0) {
-                    if (mapped[line_start] == '>') {
-                        expect_sequence = true;
-                    }
-                    else if (expect_sequence) {
-                        sequences.push_back({ mapped + line_start, (int)line_len });
-                        expect_sequence = false;
-                    }
-                }
-                if (mapped[i] == '\r' && i + 1 < file_size && mapped[i + 1] == '\n') i++;
-                line_start = i + 1;
-            }
-        }
-        return sequences;
-    }
-
-    // --- Parallel parsing for larger files ---
     size_t chunk_size = (file_size + num_threads - 1) / num_threads;
     std::vector<std::vector<SequenceInfo>> thread_results(num_threads);
 
@@ -254,71 +206,43 @@ std::vector<SequenceInfo> parse_fasta_parallel(const char* filename, size_t& fil
         size_t start = tid * chunk_size;
         size_t end = std::min<size_t>(file_size, start + chunk_size);
 
-        // Extend end to next newline so we don’t cut a line in half
-        while (end < file_size && mapped[end] != '\n' && mapped[end] != '\r') end++;
+        // Extend end to next header so a sequence isnt cut in half
+        while (end < file_size && mapped[end] != '>') end++;
 
-        // Adjust start to line boundary (except for thread 0)
+        // Align start to a header (except for thread 0)
         if (tid > 0) {
-            while (start < end && mapped[start] != '\n' && mapped[start] != '\r') start++;
-            if (start < end) start++;
+            while (start < end && mapped[start] != '>') start++;
         }
 
-        bool expect_sequence = false;
-        size_t line_start = start;
         auto& my_results = thread_results[tid];
 
-        for (size_t i = start; i < end; i++) {
-            if (mapped[i] == '\n' || mapped[i] == '\r') {
-                size_t line_len = i - line_start;
-                if (line_len > 0) {
-                    if (mapped[line_start] == '>') {
-                        expect_sequence = true;
-                    }
-                    else if (expect_sequence) {
-                        // Trim trailing CR if present
-                        while (line_len > 0 && (mapped[line_start + line_len - 1] == '\r' ||
-                            mapped[line_start + line_len - 1] == '\n'))
-                            line_len--;
-
-                        if (line_len > 0) {
-                            my_results.push_back({ mapped + line_start, (int)line_len });
-                        }
-                        expect_sequence = false;
-                    }
+        size_t pos = start;
+        while (pos < end) {
+            if (mapped[pos] == '>') {
+                // Skip header line
+                while (pos < end && mapped[pos] != '\n' && mapped[pos] != '\r') {
+                    pos++;
                 }
-                if (mapped[i] == '\r' && i + 1 < end && mapped[i + 1] == '\n') i++;
-                line_start = i + 1;
+                // Skip newline(s)
+                while (pos < end && (mapped[pos] == '\n' || mapped[pos] == '\r')) {
+                    pos++;
+                }
+                // Read sequence line
+                size_t seq_start = pos;
+                while (pos < end && mapped[pos] != '\n' && mapped[pos] != '\r') {
+                    pos++;
+                }
+                size_t seq_end = pos;
+
+                if (seq_end > seq_start) {
+                    my_results.push_back({ mapped + seq_start, (int)(seq_end - seq_start) });
+                }
+            }
+            else {
+                pos++;
             }
         }
-
-        // *** NEW: handle dangling header at chunk end ***
-        if (expect_sequence && line_start < end) {
-            size_t line_len = end - line_start;
-            while (line_len > 0 && (mapped[line_start + line_len - 1] == '\r' ||
-                mapped[line_start + line_len - 1] == '\n'))
-                line_len--;
-            if (line_len > 0) {
-                my_results.push_back({ mapped + line_start, (int)line_len });
-            }
-        }
-
-        // If ends
-        if (expect_sequence) {
-            size_t line_len = end - line_start;
-            while (line_len > 0 && (mapped[line_start + line_len - 1] == '\r' ||
-                mapped[line_start + line_len - 1] == '\n'))
-                line_len--;
-
-            if (line_len > 0) {
-                my_results.push_back({ mapped + line_start, (int)line_len });
-            }
-            expect_sequence = false;
-        }
-
     }
-
-    // After all threads finish, merge results as before
-
 
     // Merge thread results
     size_t total = 0;
@@ -328,141 +252,8 @@ std::vector<SequenceInfo> parse_fasta_parallel(const char* filename, size_t& fil
         sequences.insert(sequences.end(), v.begin(), v.end());
     }
 
-   
-
-
     return sequences;
 }
-
-
-// Parse FASTA file in parallel using memory mapping
-/*
-std::vector<SequenceInfo> parse_fasta_parallel(const char* filename, size_t& file_size)
-{
-    std::vector<SequenceInfo> sequences;
-
-#ifdef _WIN32
-    // Windows memory mapping
-    HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL,
-        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "Error: failed to open file %s\n", filename);
-        return sequences;
-    }
-
-    LARGE_INTEGER fileSize;
-    GetFileSizeEx(hFile, &fileSize);
-    file_size = fileSize.QuadPart;
-
-    HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
-    if (!hMapping) {
-        CloseHandle(hFile);
-        fprintf(stderr, "Error: failed to create file mapping\n");
-        return sequences;
-    }
-
-    const char* mapped = (const char*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
-    if (!mapped) {
-        CloseHandle(hMapping);
-        CloseHandle(hFile);
-        fprintf(stderr, "Error: failed to map file\n");
-        return sequences;
-    }
-#else
-    // Unix memory mapping
-    int fd = open(filename, O_RDONLY);
-    if (fd == -1) {
-        fprintf(stderr, "Error: failed to open file %s\n", filename);
-        return sequences;
-    }
-
-    struct stat sb;
-    if (fstat(fd, &sb) == -1) {
-        close(fd);
-        fprintf(stderr, "Error: failed to get file size\n");
-        return sequences;
-    }
-    file_size = sb.st_size;
-
-    const char* mapped = (const char*)mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped == MAP_FAILED) {
-        close(fd);
-        fprintf(stderr, "Error: failed to map file\n");
-        return sequences;
-    }
-#endif
-
-    printf("File mapped: %zu bytes\n", file_size);
-
-    // PARALLEL PARSING: Divide file into chunks for parallel scanning
-    int num_threads = omp_get_max_threads();
-    size_t chunk_size = file_size / num_threads;
-
-    std::vector<std::vector<size_t>> thread_seq_positions(num_threads);
-
-    printf("Scanning for sequences in parallel...\n");
-
-#pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
-        size_t start = tid * chunk_size;
-        size_t end = (tid == num_threads - 1) ? file_size : (tid + 1) * chunk_size;
-
-        // Adjust start to beginning of a line (except for thread 0)
-        if (tid > 0) {
-            while (start < end && mapped[start] != '\n') start++;
-            if (start < end) start++; // Move past the newline
-        }
-
-        std::vector<size_t>& my_positions = thread_seq_positions[tid];
-
-        // Scan for sequence lines
-        bool expect_sequence = false;
-        size_t line_start = start;
-
-        for (size_t i = start; i < end; i++) {
-            if (mapped[i] == '\n') {
-                if (expect_sequence && i > line_start) {
-                    my_positions.push_back(line_start);
-                    my_positions.push_back(i - line_start);
-                    expect_sequence = false;
-                }
-                else if (i > line_start && mapped[line_start] == '>') {
-                    expect_sequence = true;
-                }
-                line_start = i + 1;
-            }
-        }
-
-        // Handle last line
-        if (expect_sequence && line_start < end && tid == num_threads - 1) {
-            my_positions.push_back(line_start);
-            my_positions.push_back(end - line_start);
-        }
-    }
-
-    // Count total sequences
-    size_t total_sequences = 0;
-    for (const auto& positions : thread_seq_positions) {
-        total_sequences += positions.size() / 2;
-    }
-
-    printf("Found %zu sequences\n", total_sequences);
-    sequences.reserve(total_sequences);
-
-    // Merge results
-    for (const auto& positions : thread_seq_positions) {
-        for (size_t i = 0; i < positions.size(); i += 2) {
-            SequenceInfo info;
-            info.start = mapped + positions[i];
-            info.length = (int)positions[i + 1];
-            sequences.push_back(info);
-        }
-    }
-
-    return sequences;
-}
-*/
 
 int main(int argc, char* argv[])
 {
@@ -499,10 +290,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    printf("Processing %zu sequences...\n", sequences.size());
 
     // ========== BUILD WORK QUEUE IN PARALLEL ==========
-    printf("Building work queue in parallel...\n");
 
     int num_threads = omp_get_max_threads();
     std::vector<std::vector<PartitionWork>> thread_work(num_threads);
@@ -543,7 +332,6 @@ int main(int argc, char* argv[])
     }
     int total_partitions = doc_id_offsets[num_threads - 1] + thread_doc_counts[num_threads - 1];
 
-    printf("Total partitions: %d\n", total_partitions);
 
     // Merge work queues in parallel
     std::vector<PartitionWork> all_work(total_partitions);
@@ -555,12 +343,11 @@ int main(int argc, char* argv[])
 
         for (size_t i = 0; i < thread_work[tid].size(); i++) {
             all_work[offset + i] = thread_work[tid][i];
-            all_work[offset + i].doc_id = offset + i;
+            all_work[offset + i].doc_id = thread_work[tid][i].seq_idx; //doc ids were incrementing per partition
         }
     }
 
     // ========== PARALLEL SIGNATURE COMPUTATION ==========
-    printf("Processing %zu partitions in parallel...\n", all_work.size());
 
     std::vector<PartitionSignature> results(all_work.size());
 
@@ -603,9 +390,9 @@ int main(int argc, char* argv[])
     }
 
     // ========== PARALLEL OUTPUT BUFFER CONSTRUCTION ==========
-    printf("Building output buffer in parallel...\n");
 
-    const size_t record_size = sizeof(int) + SIGNATURE_LEN / 8;  // doc_id + signature
+    // Use fixed widths: 4 bytes for doc_id, SIGNATURE_LEN/8 for signature
+    const size_t record_size = sizeof(uint32_t) + SIGNATURE_LEN / 8;
     const size_t output_size = total_partitions * record_size;
 
     // Allocate output buffer
@@ -617,35 +404,33 @@ int main(int argc, char* argv[])
     {
         byte* dest = output_buffer.data() + (i * record_size);
 
-        // Write doc_id
-        memcpy(dest, &results[i].doc_id, sizeof(int));
-        dest += sizeof(int);
+        // Write doc_id as 32-bit
+        uint32_t docid32 = static_cast<uint32_t>(results[i].doc_id);
+        memcpy(dest, &docid32, sizeof(uint32_t));
+        dest += sizeof(uint32_t);
 
         // Write signature
         memcpy(dest, results[i].signature, SIGNATURE_LEN / 8);
     }
 
     // ========== SINGLE SEQUENTIAL WRITE ==========
-    printf("Writing output file...\n");
 
     char outfile[256];
     sprintf_s(outfile, 256, "%s.part%d_sigs%02d_%d", filename, PARTITION_SIZE, WORDLEN, SIGNATURE_LEN);
 
     FILE* sig_file;
-    fopen_s(&sig_file, outfile, "wb");
+    fopen_s(&sig_file, outfile, "wb"); //Output to binary despite original using "w"
 
-    // Single large write - much faster than many small writes!
+    // Single large write
     fwrite(output_buffer.data(), 1, output_size, sig_file);
 
     fclose(sig_file);
+
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
 
     printf("%s %f seconds\n", filename, duration.count());
-    printf("Method: Fully parallel (mmap I/O, parallel output buffer)\n");
-    printf("Threads used: %d\n", omp_get_max_threads());
-    printf("Output size: %.2f MB\n", output_size / (1024.0 * 1024.0));
 
     return 0;
 }

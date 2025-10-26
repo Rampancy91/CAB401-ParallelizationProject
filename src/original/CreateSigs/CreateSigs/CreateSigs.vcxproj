@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{bbf27b73-b560-4343-8488-5185a4acdffe}</ProjectGuid>
+    <ProjectGuid>{61c15cab-2e64-4814-b75a-9efd8dd60c2c}</ProjectGuid>
     <RootNamespace>CreateSigs</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -116,9 +116,9 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <OpenMPSupport>true</OpenMPSupport>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <EnableEnhancedInstructionSet>AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -126,8 +126,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\final_ISAAC-rand.cpp" />
-    <ClCompile Include="..\..\final_signature.cpp" />
+    <ClCompile Include="..\..\ISAAC-rand.cpp" />
+    <ClCompile Include="..\..\signature.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\uthash.h" />

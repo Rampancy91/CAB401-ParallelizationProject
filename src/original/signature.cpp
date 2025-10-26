@@ -1,10 +1,9 @@
-﻿#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "uthash.h"
 #include <chrono>
-
 
 typedef unsigned char byte;
 
@@ -116,19 +115,14 @@ void compute_signature(char* sequence, int length)
 
 void partition(char* sequence, int length)
 {
-    static int total_partitions = 0;  // ← Add this
-    int i = 0;
+    int i=0;
     do
     {
-        compute_signature(sequence + i, min(PARTITION_SIZE, length - i));
-        total_partitions++;  // ← Add this
-        i += PARTITION_SIZE / 2;
-    } while (i + PARTITION_SIZE / 2 < length);
-    doc++;
-
-    if (doc == 200000) {  // ← Add this
-        printf("Sequential: %d sequences, %d partitions\n", doc, total_partitions);
+        compute_signature(sequence+i, min(PARTITION_SIZE, length-i));
+        i += PARTITION_SIZE/2;
     }
+    while (i+PARTITION_SIZE/2 < length);
+    doc++;
 }
 
 int power(int n, int e)
@@ -142,18 +136,7 @@ int power(int n, int e)
 int main(int argc, char* argv[])
 {
     //const char* filename = "qut2.fasta";
-    //const char* filename = "qut3.fasta";
-
-    const char* filename; 
-
-    // Allowing command line input or default to small test file
-
-    if (argc > 1) {
-        filename = argv[1];
-    }
-    else {
-        filename = "test.fasta";  // Default
-    }
+    const char* filename = "qut3.fasta";
     
     WORDLEN = 3;
     PARTITION_SIZE = 16;
@@ -175,7 +158,7 @@ int main(int argc, char* argv[])
 
     char outfile[256];
     sprintf_s(outfile, 256, "%s.part%d_sigs%02d_%d", filename, PARTITION_SIZE, WORDLEN, SIGNATURE_LEN);
-    fopen_s(&sig_file, outfile, "wb");
+    fopen_s(&sig_file, outfile, "w");
 
     char buffer[10000];
     while (!feof(file))
@@ -184,21 +167,11 @@ int main(int argc, char* argv[])
         fgets(buffer, 10000, file);
         int n = (int)strlen(buffer) - 1;
         buffer[n] = 0;
-
-        static int debug_count = 0;
-        if (debug_count < 5) {
-            printf("Sequential seq %d: len=%d, first 40 chars: %.40s\n",
-                debug_count, n, buffer);
-            debug_count++;
-        }
-
         partition(buffer, n);
     }
     fclose(file);
 
     fclose(sig_file);
-
-    printf("doc counter = %d\n", doc);
 
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
