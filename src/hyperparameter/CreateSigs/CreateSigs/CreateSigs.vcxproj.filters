@@ -18,7 +18,7 @@
     <ClCompile Include="..\..\ISAAC-rand.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\signature_parallel.cpp">
+    <ClCompile Include="..\..\signature.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

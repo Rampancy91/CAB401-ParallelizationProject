@@ -13,7 +13,7 @@ typedef unsigned char byte;
 
 #define SIGNATURE_LEN 64
 
-int DENSITY  = 21;
+int DENSITY = 21;
 int PARTITION_SIZE;
 
 int inverse[256];
@@ -27,7 +27,7 @@ void Init();
 int doc_sig[SIGNATURE_LEN];
 
 int WORDLEN;
-FILE *sig_file;
+FILE* sig_file;
 
 typedef struct
 {
@@ -36,7 +36,7 @@ typedef struct
     UT_hash_handle hh;
 } hash_term;
 
-hash_term *vocab = NULL;
+hash_term* vocab = NULL;
 
 //pre-compute signatures array
 // Only 20^3 = 8000 possible combinations
@@ -74,29 +74,29 @@ void index_to_kmer(int index, char* term)
     term[WORDLEN] = '\0';
 }
 
-short* compute_new_term_sig(char* term, short *term_sig)
+short* compute_new_term_sig(char* term, short* term_sig)
 {
     seed_random(term, WORDLEN);
 
-    int non_zero = SIGNATURE_LEN * DENSITY/100;
+    int non_zero = SIGNATURE_LEN * DENSITY / 100;
 
     int positive = 0;
-    while (positive < non_zero/2)
+    while (positive < non_zero / 2)
     {
         short pos = random_num(SIGNATURE_LEN);
-        if (term_sig[pos] == 0) 
-	{
+        if (term_sig[pos] == 0)
+        {
             term_sig[pos] = 1;
             positive++;
         }
     }
 
     int negative = 0;
-    while (negative < non_zero/2)
+    while (negative < non_zero / 2)
     {
         short pos = random_num(SIGNATURE_LEN);
-        if (term_sig[pos] == 0) 
-	{
+        if (term_sig[pos] == 0)
+        {
             term_sig[pos] = -1;
             negative++;
         }
@@ -136,9 +136,9 @@ short* find_sig_fast(char* term)
 }
 
 // Old version - hash table look up
-short *find_sig_hash(char* term)
+short* find_sig_hash(char* term)
 {
-    hash_term *entry;
+    hash_term* entry;
     HASH_FIND(hh, vocab, term, WORDLEN, entry);
     if (entry == NULL)
     {
@@ -163,7 +163,7 @@ short* find_sig(char* term)
 
 // MODIFIED: pass doc_sig as parameter to make thread safe
 
-void signature_add(char* term, int* doc_sig)  
+void signature_add(char* term, int* doc_sig)
 {
     short* term_sig = find_sig(term);
     for (int i = 0; i < SIGNATURE_LEN; i++)
@@ -238,7 +238,7 @@ std::vector<PartitionSignature> partition(char* sequence, int length, int starti
 int power(int n, int e)
 {
     int p = 1;
-    for (int j=0; j<e; j++)
+    for (int j = 0; j < e; j++)
         p *= n;
     return p;
 }
@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
     // ========== PARALLEL PROCESSING ==========
     std::vector<std::vector<PartitionSignature>> all_signatures(sequences.size());
 
-    #pragma omp parallel for schedule(guided, 64)  
+#pragma omp parallel for schedule(guided, 64)  
     for (int seq_idx = 0; seq_idx < (int)sequences.size(); seq_idx++)
     {
         int starting_doc = doc_id_starts[seq_idx];
